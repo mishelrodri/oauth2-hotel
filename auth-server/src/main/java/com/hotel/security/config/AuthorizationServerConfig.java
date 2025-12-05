@@ -1,14 +1,17 @@
-package com.hotel.config;
+package com.hotel.security.config;
 
+import com.hotel.security.filters.CreateUserFilter;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -18,16 +21,25 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
+import org.springframework.security.oauth2.server.authorization.web.OAuth2TokenEndpointFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
 import java.util.UUID;
 
 @Configuration
+@RequiredArgsConstructor
 public class AuthorizationServerConfig {
+
+    private final CreateUserFilter createUserFilter;
 
     /**
      * Configuración específica del servidor de autorización
@@ -44,15 +56,16 @@ public class AuthorizationServerConfig {
                 .securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
                 .with(authorizationServerConfigurer, (authorizationServer) ->
                         authorizationServer
-                                .oidc(Customizer.withDefaults())	// Enable OpenID Connect 1.0
+                                .oidc(Customizer.withDefaults())    // Enable OpenID Connect 1.0
                 )
                 .authorizeHttpRequests((authorize) ->
                         authorize
                                 .anyRequest().authenticated()
-                );
+                )
+                .addFilterBefore(createUserFilter, AuthorizationFilter.class);
 
-                // Redirect to the login page when not authenticated from the
-                // authorization endpoint
+        // Redirect to the login page when not authenticated from the
+        // authorization endpoint
 
 //                .exceptionHandling((exceptions) -> exceptions
 //                        .defaultAuthenticationEntryPointFor(
@@ -75,12 +88,24 @@ public class AuthorizationServerConfig {
                 .clientSecret("{noop}secret")  // Contraseña del cliente
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)  // Tipo de flujo
+                .tokenSettings(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofSeconds(3000))
+                        .build()
+                )
                 .scope("read")  // Permisos que puede solicitar
                 .scope("write")
                 .build();
 
         return new InMemoryRegisteredClientRepository(client);
     }
+
+//    @Bean
+//    public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer() {
+//        return context -> {
+////            Authentication principal = context.getPrincipal();
+//            context.getClaims().claim("username", "manolo");
+//        };
+//    }
 
     /**
      * Configuración de los tokens JWT
