@@ -1,17 +1,23 @@
 package com.hotel.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.ToString;
 
 @Builder
+@Entity
+@Table(name = "users")
 @Getter
-@ToString
 public class UserByte {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private Long id;
 
     private String             username;
 
+    @JsonIgnore
     private String             password;
 
 //    private String             deviceStatus;
