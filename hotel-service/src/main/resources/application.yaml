@@ -6,3 +6,7 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:9000 # Dónde está el Authorization Server
+
+security:
+  exposed-ant-matchers:
+    - /v1/hotel/test
