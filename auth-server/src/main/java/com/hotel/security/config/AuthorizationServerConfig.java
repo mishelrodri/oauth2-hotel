@@ -1,16 +1,24 @@
 package com.hotel.security.config;
 
+import com.hotel.entities.UserByte;
+import com.hotel.security.filters.AuthenticationUserFilter;
 import com.hotel.security.filters.CreateUserFilter;
+import com.hotel.service.UserService;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -21,22 +29,29 @@ import org.springframework.security.oauth2.server.authorization.config.annotatio
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
+import java.util.Set;
 import java.util.UUID;
 
 @Configuration
+@Slf4j
 @RequiredArgsConstructor
 public class AuthorizationServerConfig {
 
-    private final CreateUserFilter createUserFilter;
+    private final AuthenticationUserFilter authenticationUserFilter;
+    private final UserService userService;
 
     /**
      * Configuración específica del servidor de autorización
@@ -64,24 +79,14 @@ public class AuthorizationServerConfig {
                         authorize
                                 .anyRequest().authenticated()
                 )
-                .addFilterBefore(createUserFilter, AuthorizationFilter.class);
-
-        // Redirect to the login page when not authenticated from the
-        // authorization endpoint
-
-//                .exceptionHandling((exceptions) -> exceptions
-//                        .defaultAuthenticationEntryPointFor(
-//                                new LoginUrlAuthenticationEntryPoint("/login"),
-//                                new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
-//                        )
-//                );
+                .addFilterBefore(authenticationUserFilter, AuthorizationFilter.class);
 
         return http.build();
     }
 
     @Bean
     public AuthenticationSuccessHandler customTokenResponseHandler() {
-        return new CustomTokenResponseHandler();
+        return new CustomTokenResponseHandler(userService);
     }
 
     /**
@@ -113,6 +118,47 @@ public class AuthorizationServerConfig {
 //            context.getClaims().claim("username", "manolo");
 //        };
 //    }
+
+@Bean
+public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserService userService) {
+    return context -> {
+
+        // Obtén el request actual
+        ServletRequestAttributes attributes =
+                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+
+        if (attributes != null) {
+            HttpServletRequest request = attributes.getRequest();
+
+            Authentication userAuthentication = (Authentication) request.getAttribute("USER_AUTHENTICATION");
+
+            if (userAuthentication != null) {
+                String username = userAuthentication.getName();
+
+
+                UserByte userByte = userService.buscarUsuarioByUsername(username);
+
+                Set<String> authorities = AuthorityUtils.authorityListToSet(
+                        userAuthentication.getAuthorities()
+                );
+
+                context.getClaims().claim("username", username);
+                context.getClaims().claim("sub", username);
+                context.getClaims().claim("full_name", userByte.getUserFullName());
+                context.getClaims().claim("user_id", userByte.getId()); // Si tienes el ID
+                context.getClaims().claim("type_token", userByte.getTypeToken());
+                context.getClaims().claim("authorities", authorities);
+
+
+
+            } else {
+                log.warn("⚠️ No hay autenticación de usuario - usando solo client credentials");
+                context.getClaims().claim("username", null);
+                context.getClaims().claim("user_authenticated", false);
+            }
+        }
+    };
+}
 
     /**
      * Configuración de los tokens JWT

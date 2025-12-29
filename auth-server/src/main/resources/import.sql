@@ -1,0 +1,1 @@
+INSERT INTO users (username, password,ACCOUNT_NON_EXPIRED,ACCOUNT_NON_LOCKED,CREDENTIALS_NON_EXPIRED,ENABLED, TYPE_TOKEN,USER_FULL_NAME) values ('pepe', '{noop}123', true,true,true,true, 'S', 'Pedro Emmanuel Perdomo');

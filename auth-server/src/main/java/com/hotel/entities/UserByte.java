@@ -2,17 +2,21 @@ package com.hotel.entities;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
-@Builder
 @Entity
 @Table(name = "users")
 @Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class UserByte {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String             username;
@@ -38,7 +42,7 @@ public class UserByte {
 //
 //    private String             publicKey;
 //
-//    private String             userFullName;
+    private String             userFullName;
 
     private String             userEmail;
 //
@@ -56,7 +60,7 @@ public class UserByte {
 //
 //    private String             sessionToken;
 //
-//    private String             typeToken;
+    private String             typeToken;
 //
 //    private String             token;
 //

@@ -21,9 +21,6 @@ public class UserSericeImpl implements UserService {
 
     @Override
     public UserByte buscarUsuarioByUsername(String text) {
-        usuarios.stream().forEach((u)->{
-            System.out.println(u);
-        });
         return usuarios.stream().filter((u)-> u.getUsername().equals(text)).findFirst()
                 .orElseThrow(()-> new RuntimeException("NO EXISTE"));
     }

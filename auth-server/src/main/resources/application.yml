@@ -1,0 +1,11 @@
+server:
+  port: 9000
+
+spring:
+  application:
+    name: auth-server
+
+
+security:
+  exposed-ant-matchers:
+    - public

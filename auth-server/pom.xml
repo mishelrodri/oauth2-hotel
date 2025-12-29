@@ -48,6 +48,8 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
+
+        <!--	DEPENDENCIAS OPCIONALES segun el caso de uso	-->
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
