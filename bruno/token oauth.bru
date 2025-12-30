@@ -1,0 +1,25 @@
+meta {
+  name: token oauth
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://127.0.0.1:9000/oauth2/token
+  body: formUrlEncoded
+  auth: basic
+}
+
+headers {
+  X-user-name: pepe
+  X-user-password: 123
+}
+
+auth:basic {
+  username: my-client
+  password: secret
+}
+
+body:form-urlencoded {
+  grant_type: client_credentials
+}
