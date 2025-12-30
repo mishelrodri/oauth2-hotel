@@ -1,0 +1,14 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: airbnb-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9000 # Dónde está el Authorization Server
+
+security:
+  exposed-ant-matchers:
+    - /v1/hotel/test
