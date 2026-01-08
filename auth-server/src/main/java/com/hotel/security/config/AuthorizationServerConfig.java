@@ -2,10 +2,10 @@ package com.hotel.security.config;
 
 import com.hotel.entities.UserByte;
 import com.hotel.security.filters.AuthenticationUserFilter;
-import com.hotel.security.filters.CreateUserFilter;
 import com.hotel.service.UserService;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,13 +14,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.AuthorityUtils;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
@@ -34,6 +35,8 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -61,23 +64,19 @@ public class AuthorizationServerConfig {
     @Order(1)
     public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http)
             throws Exception {
-        OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
-                OAuth2AuthorizationServerConfigurer.authorizationServer();
-
-
-        authorizationServerConfigurer.tokenEndpoint(tokenEndpoint ->
-                tokenEndpoint.accessTokenResponseHandler(customTokenResponseHandler())
-        );
-
+        OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+                .tokenEndpoint(tokenEndpoint -> tokenEndpoint
+                        .accessTokenResponseHandler(customTokenResponseHandler()))
+                .oidc(Customizer.withDefaults());	// Enable OpenID Connect 1.0
         http
-                .securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
-                .with(authorizationServerConfigurer, (authorizationServer) ->
-                        authorizationServer
-                                .oidc(Customizer.withDefaults())    // Enable OpenID Connect 1.0
-                )
-                .authorizeHttpRequests((authorize) ->
-                        authorize
-                                .anyRequest().authenticated()
+                // Redirect to the login page when not authenticated from the
+                // authorization endpoint
+                .exceptionHandling((exceptions) -> exceptions
+                        .defaultAuthenticationEntryPointFor(
+                                new LoginUrlAuthenticationEntryPoint("/login"),
+                                new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
+                        )
                 )
                 .addFilterBefore(authenticationUserFilter, AuthorizationFilter.class);
 
@@ -99,25 +98,19 @@ public class AuthorizationServerConfig {
                 .clientId("my-client")  // Identificador del cliente
                 .clientSecret("{noop}secret")  // Contraseña del cliente
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)  // Tipo de flujo
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenTimeToLive(Duration.ofSeconds(3000))
                         .build()
                 )
-                .scope("read")  // Permisos que puede solicitar
-                .scope("write")
+//                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())
                 .build();
 
         return new InMemoryRegisteredClientRepository(client);
     }
-
-//    @Bean
-//    public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer() {
-//        return context -> {
-////            Authentication principal = context.getPrincipal();
-//            context.getClaims().claim("username", "manolo");
-//        };
-//    }
 
 @Bean
 public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserService userService) {
@@ -153,8 +146,6 @@ public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserService use
 
             } else {
                 log.warn("⚠️ No hay autenticación de usuario - usando solo client credentials");
-                context.getClaims().claim("username", null);
-                context.getClaims().claim("user_authenticated", false);
             }
         }
     };
@@ -166,9 +157,15 @@ public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserService use
      */
     @Bean
     public JWKSource<SecurityContext> jwkSource() {
-        RSAKey rsaKey = generateRSAKey();
+        KeyPair keyPair = generateRsaKey();
+        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
+        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+        RSAKey rsaKey = new RSAKey.Builder(publicKey)
+                .privateKey(privateKey)
+                .keyID(UUID.randomUUID().toString())
+                .build();
         JWKSet jwkSet = new JWKSet(rsaKey);
-        return (jwkSelector, securityContext) -> jwkSelector.select(jwkSet);
+        return new ImmutableJWKSet<>(jwkSet);
     }
 
     /**
@@ -176,23 +173,20 @@ public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserService use
      * La llave privada firma los tokens
      * La llave pública los verifica
      */
-    private RSAKey generateRSAKey() {
+    private static KeyPair generateRsaKey() {
+        KeyPair keyPair;
         try {
             KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
             keyPairGenerator.initialize(2048);
-            KeyPair keyPair = keyPairGenerator.generateKeyPair();
-
-            RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
-            RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
-
-            return new RSAKey.Builder(publicKey)
-                    .privateKey(privateKey)
-                    .keyID(UUID.randomUUID().toString())
-                    .build();
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
+            keyPair = keyPairGenerator.generateKeyPair();
         }
+        catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+        return keyPair;
     }
+
+
 
     /**
      * Decodificador de tokens JWT
@@ -209,9 +203,7 @@ public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserService use
      */
     @Bean
     public AuthorizationServerSettings authorizationServerSettings() {
-        return AuthorizationServerSettings.builder()
-                .issuer("http://localhost:9000")
-                .build();
+        return AuthorizationServerSettings.builder().build();
     }
 
 }
