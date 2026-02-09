@@ -1,0 +1,13 @@
+server:
+  port: 9000
+
+spring:
+  application:
+    name: auth-server-simple
+
+# Logging para ver la clave pública
+logging:
+  level:
+    root: INFO
+    com.bytesw.authserver: DEBUG
+    org.springframework.security: DEBUG
