@@ -1,11 +1,20 @@
 spring:
   application:
     name: hotel-service
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:9000 # Dónde está el Authorization Server
+#  security:
+#    oauth2:
+#      resourceserver:
+#        jwt:
+#          key-value: |
+#            -----BEGIN PUBLIC KEY-----
+#            MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwtnoBTk/uqSlCRsMDuGo
+#            hIz0Muntcg0m1tcf7MrGV5FgRZ6s/NYQR2JgvkfGsKjJZdy2D01NqDj0u066gI90
+#            zdYzqXNWCDeJF37l5msIEH7wfF3WggXPPpMOcBx8UasC+PzTVo2usBUujVKEgSzB
+#            gYsr1YhbHb6Y7Dhfx5SzCVZxBugaG6NRpiDu0D2V4cSzyABryJYUMeGodvmJcqUg
+#            CZDw/AjkO4nJ/xY8wcLcmQ9L7J5cwP8u/KZiRGjOc3LfeMdVrRbTIp6cd8TOwi2L
+#            Th6hsNUazR7Yz7rXb7FA+S/HCbjkWuJ0erMPkpCopa8QNYiv+Ms87Wm4D5BGf7zL
+#            ZwIDAQAB
+#            -----END PUBLIC KEY-----
 
 security:
   exposed-ant-matchers:

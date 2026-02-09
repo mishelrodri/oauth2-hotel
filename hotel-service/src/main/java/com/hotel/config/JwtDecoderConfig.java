@@ -1,0 +1,35 @@
+package com.hotel.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
+
+@Configuration
+public class JwtDecoderConfig {
+
+    @Bean
+    public JwtDecoder jwtDecoder() throws Exception {
+        String publicKeyPEM = "-----BEGIN PUBLIC KEY-----\n" +
+                "MIIBIjANBgkqhk..............\n" +
+                "-----END PUBLIC KEY-----";
+
+        // Parse PEM to PublicKey
+        String publicKeyContent = publicKeyPEM
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replaceAll("\\s", "");
+
+        byte[] decodedKey = Base64.getDecoder().decode(publicKeyContent);
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decodedKey);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PublicKey publicKey = keyFactory.generatePublic(keySpec);
+
+        return NimbusJwtDecoder.withPublicKey((java.security.interfaces.RSAPublicKey) publicKey).build();
+    }
+}

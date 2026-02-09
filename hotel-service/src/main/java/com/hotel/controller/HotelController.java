@@ -37,6 +37,7 @@ public class HotelController {
 //                .build();
 
 //        return jwt.getClaimAsString("username");
+        System.out.println("⚠️⚠️ "+ principal.getName());
         return principal.getName();
     }
 }
